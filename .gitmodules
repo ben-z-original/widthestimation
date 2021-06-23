@@ -1,0 +1,6 @@
+[submodule "crack-width"]
+	path = crack-width
+	url = https://github.com/uncle-ben-z/crack-width.git
+[submodule "projection"]
+	path = projection
+	url = https://github.com/uncle-ben-z/projection.git
