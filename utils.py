@@ -1,6 +1,46 @@
 import numpy as np
+import networkx as nx
 from matplotlib import pyplot as plt
 from scipy.ndimage.filters import gaussian_filter
+
+
+def place_nodes(G, gap=0.01):
+    """ Interpolate and place graph nodes with a specific gap in-between. """
+    # place nodes a gap points
+    GG = nx.Graph()
+
+    # place nodes
+    for i in G.edges:
+        pts = np.array(G.edges[i]['points'])
+        nrmls = np.array(G.edges[i]['normals'])
+
+        # determine x
+        diff = np.sqrt(np.sum(np.power(np.diff(pts, axis=0), 2), axis=1))
+        xp = np.append(0, np.cumsum(diff))
+        x = np.arange(0 + xp[-1] % gap / 2, xp[-1], gap)
+        x = np.hstack((0, x, xp[-1]))
+
+        # interpolate points
+        positions = np.stack([np.interp(x, xp, pts[:, 0]),
+                              np.interp(x, xp, pts[:, 1]),
+                              np.interp(x, xp, pts[:, 2])], axis=1)
+        # interpolate normals
+        normals = np.stack([np.interp(x, xp, nrmls[:, 0]),
+                            np.interp(x, xp, nrmls[:, 1]),
+                            np.interp(x, xp, nrmls[:, 2])], axis=1)
+
+        # construct keys
+        keys = ["_".join(item) for item in positions.astype(str)]
+
+        # set nodes and edges
+        nodes = [(keys[i], {"pos": positions[i, ...], "normal": normals[i, ...]}) for i in range(0, len(positions))]
+        edges = [(keys[i - 1], keys[i]) for i in range(1, len(positions))]
+
+        GG.add_nodes_from(nodes)
+        GG.add_edges_from(edges)
+
+    return GG
+
 
 
 def centralize_profline(prof_line):
@@ -23,19 +63,20 @@ def centralize_profline(prof_line):
 
 def rectangle_transform(prof_line, base=20, height=0.9):
     # determine relevant measures
+    leng = len(prof_line)
     medi = np.median(prof_line)
-    mini = np.min(prof_line[10:20])
+    mini = np.min(prof_line[leng//3:2*leng//3])
     hori = (medi - mini) * height + mini
     base = min(base, mini)
 
     # determine width
-    x = np.arange(0, 30.1, 0.1)
-    gx = np.interp(x, np.arange(0, 30), prof_line)
+    x = np.arange(0, leng, 0.1)
+    gx = np.interp(x, np.arange(0, leng), prof_line)
     a = np.full((len(x)), hori)
     b = np.full((len(x)), base)
 
     # apply equation from paper
-    nom = a[0] * 30 - np.trapz(gx - np.abs(gx - a), x)
+    nom = a[0] * leng - np.trapz(gx - np.abs(gx - a), x)
     w = nom / (2 * (a[0] - b[0]))
 
     return w
