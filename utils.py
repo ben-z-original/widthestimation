@@ -42,6 +42,13 @@ def place_nodes(G, gap=0.01):
     return GG
 
 
+def profline_variance(prof_line):
+    """ Compares the variance of the inner and outer variance of the profile line. """
+    outer_var = np.var(np.hstack([prof_line[:len(prof_line) // 3], prof_line[2 * len(prof_line) // 3:]]))
+    inner_var = np.var(prof_line[len(prof_line) // 3:2 * len(prof_line) // 3:])
+
+    return inner_var - outer_var
+
 
 def centralize_profline(prof_line):
     length = len(prof_line)
@@ -155,3 +162,5 @@ def fit_parabola(prof_line):
 
         x = x[keep]
         y = y[keep]
+
+
