@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import open3d as o3d
 import networkx as nx
@@ -6,7 +7,8 @@ from matplotlib import pyplot as plt
 from matplotlib.pyplot import figure
 
 from skimage.measure import profile_line
-from utils import centralize_profline, rectangle_transform, place_nodes
+from utils import centralize_profline, profline_variance, rectangle_transform, place_nodes
+from sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 
 # paths
 xml_path = "/media/******/******/data/referenzobjekte/******bruecke/points/cameras_all.xml"
@@ -26,7 +28,7 @@ scene.prepare_matrices()
 scene.load_images(path_list=None, npy_path="images.npy", scale=1.0)
 
 # load graph
-G = nx.read_gpickle("../iterative-contraction/graphs/graph_0.pickle")
+G = nx.read_gpickle("/home/******/repos/iterative-contraction/graphs/graph_complete.pickle")
 
 # interpolate nodes
 G = place_nodes(G, gap=0.01)
@@ -75,11 +77,17 @@ for node in G.nodes:
         d = distances[idx] * 1000  # to mm
         width = width * d * pixel_size / f
 
+        # check if width estimation is viable
+        if profline_variance(prof_line) < 0:
+            G.nodes[node]["width"] = -1
+        else:
+            G.nodes[node]["width"] = width
+
         # visualize
-        if True:
+        if False and True and np.random.random() < 0.05:
             figure(figsize=(80, 60))
             plt.subplot(121)
-            plt.title(str(width))
+            plt.title(str(width) + " | " + str(profline_variance(prof_line)))
             plt.imshow(img, 'gray')
             plt.plot(uv0[idx, 0], uv0[idx, 1], 'o')
             plt.plot(uv1[idx, 0], uv1[idx, 1], 'x')
@@ -91,3 +99,9 @@ for node in G.nodes:
             plt.plot(prof_line)
             plt.plot(prof_line2)
             plt.show()
+
+# o3d.visualization.draw_geometries([segment_color_pcd, line_set])
+file_name = "any_sdiff"
+sdiff = create_empty_SDIFF()
+sdiff = append_feature(sdiff, G, file_name)
+save_SDIFF(sdiff, os.path.join(".", file_name + ".sdiff"), None)
