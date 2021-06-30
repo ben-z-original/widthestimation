@@ -29,6 +29,12 @@ def construct_line(sdiff, G, node):
                     'mean': -1,
                     'median': -1
                 },
+                'probability': {
+                    'max': -1,
+                    'mean': -1,
+                    'median': -1,
+                    'std': -1
+                },
                 'vertices': []
             }
         })
@@ -52,6 +58,13 @@ def construct_line(sdiff, G, node):
                 'coordinates': list(G.nodes[curr_node]['pos']),
                 'width': width
             })
+
+            # in case vertex has id for width plot
+            try:
+                sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'][-1]['id'] = \
+                G.nodes[curr_node]['id']
+            except:
+                pass
 
             # update node
             last_node = curr_node
