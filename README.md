@@ -40,19 +40,20 @@ The core functionality is to be found in utils:
 ```python
 def rectangle_transform(prof_line, base=20, height=0.9):
     # determine relevant measures
+    length = len(prof_line)
     medi = np.median(prof_line)
-    mini = np.min(prof_line[10:20])
+    mini = np.min(prof_line[length//3:2*length//3])
     hori = (medi - mini) * height + mini
     base = min(base, mini)
 
     # determine width
-    x = np.arange(0, 30.1, 0.1)
-    gx = np.interp(x, np.arange(0, 30), prof_line)
+    x = np.arange(0, length, 0.1)
+    gx = np.interp(x, np.arange(0, length), prof_line)
     a = np.full((len(x)), hori)
     b = np.full((len(x)), base)
 
     # apply equation from paper
-    nom = a[0] * 30 - np.trapz(gx - np.abs(gx - a), x)
+    nom = a[0] * length - np.trapz(gx - np.abs(gx - a), x)
     w = nom / (2 * (a[0] - b[0]))
 
     return w
