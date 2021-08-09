@@ -51,9 +51,10 @@ def profline_variance(prof_line):
 
 
 def centralize_profline(prof_line):
+    """ Move profile minimum to center. """
     length = len(prof_line)
     center = length // 2
-    argmini = np.argmin(prof_line[length // 3:2 * length // 3]) + length // 3
+    argmini = np.argmin(prof_line)
     shift = center - argmini
 
     # centralize
@@ -65,31 +66,40 @@ def centralize_profline(prof_line):
     elif shift > 0:
         prof_line[:shift] = prof_line[shift]
 
-    return prof_line
+    return prof_line, shift
 
 
 def rectangle_transform(prof_line, base=20, height=0.9):
+    """ Apply rectangel transform for width estimation. """
     # determine relevant measures
     length = len(prof_line)
     medi = np.median(prof_line)
-    mini = np.min(prof_line[length//3:2*length//3])
+    mini = np.min(prof_line[length // 3:2 * length // 3])
     hori = (medi - mini) * height + mini
     base = min(base, mini)
 
-    # determine width
+    # set parameters
     x = np.arange(0, length, 0.1)
     gx = np.interp(x, np.arange(0, length), prof_line)
     a = np.full((len(x)), hori)
     b = np.full((len(x)), base)
 
+    # cancel irrelevant regions
+    intersects = np.nonzero(np.gradient(np.sign(gx - a)))[0]
+    inter_idx = np.where(np.sign(intersects - len(gx) // 2) == 1)[0][0]
+    inter_idxs = intersects[inter_idx-1:inter_idx+1]
+    gx[:inter_idxs[0]] = a[:inter_idxs[0]]
+    gx[inter_idxs[1]:] = a[inter_idxs[1]:]
+
     # apply equation from paper
     nom = a[0] * length - np.trapz(gx - np.abs(gx - a), x)
     w = nom / (2 * (a[0] - b[0]))
 
-    return w
+    return w, a[0], b[0], inter_idxs/10
 
 
 def intersection_approach(prof_line, height=0.5):
+    """ Apply naive intersection approach for width estimation. """
     sampling = 100
     prof_line = np.interp(np.arange(0, 30, 1 / sampling), np.arange(0, 30), prof_line)
 
@@ -123,6 +133,7 @@ def intersection_approach(prof_line, height=0.5):
 
 
 def fit_parabola(prof_line):
+    """ Apply parabola fitting for width estimation. """
     x = np.arange(0, 30, 1.0)
     y = np.interp(np.arange(0, 30, 1.0), np.arange(0, 30), prof_line)
 
@@ -162,5 +173,3 @@ def fit_parabola(prof_line):
 
         x = x[keep]
         y = y[keep]
-
-
