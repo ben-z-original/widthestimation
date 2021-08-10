@@ -91,7 +91,7 @@ def rectangle_transform(prof_line, base=20, height=0.9):
     try:
         inter_idx = np.where(np.sign(intersects - len(gx) // 2) == 1)[0][0]
     except:
-        return -1, a[0], b[0], np.array([2,3])
+        return -1, a[0], b[0], np.array([2, 3])
 
     inter_idx = max(inter_idx, 1)
     inter_idxs = intersects[inter_idx - 1:inter_idx + 1]
@@ -279,7 +279,7 @@ def graph2widths(G, scene, width_plots=False):
                 fig.suptitle(
                     "Breite [px]: " + str(np.round(width_px, 2)) +
                     "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
-                #plt.show()
+                # plt.show()
                 plt.savefig(
                     "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/widths/" + id + ".png",
                     dpi=300,

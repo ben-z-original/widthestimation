@@ -1,14 +1,8 @@
 import os
-import time
 from tqdm import tqdm
-import numpy as np
-import open3d as o3d
 import networkx as nx
 from projection.scene import Scene
-from matplotlib import pyplot as plt
-from matplotlib.pyplot import figure
-from skimage.measure import profile_line
-from utils import centralize_profline, profline_variance, rectangle_transform, place_nodes, graph2widths
+from utils import place_nodes, graph2widths
 from sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 
 categories = ["background", "control_point", "vegetation", "efflorescence", "corrosion", "spalling", "crack"]
@@ -41,19 +35,17 @@ def graph2sdiff(scene, graph_path, sdiff_path, file_name, width_plots=False):
             except:
                 print()
 
-
-
-
     save_SDIFF(sdiff, os.path.join(sdiff_path, file_name + ".sdiff"), None)
+
 
 if __name__ == "__main__":
     # paths
-    xml_path = "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/cameras.xml" # "/media/******/******/data/referenzobjekte/******bruecke/points/cameras_all.xml"
+    xml_path = "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/cameras.xml"  # "/media/******/******/data/referenzobjekte/******bruecke/points/cameras_all.xml"
     path_list = [
         "/media/******/******/data/referenzobjekte/******bruecke/Christian/VSued_Abplatzung_20210428/0_jpg"]
     imgs_path = "images.npy"
-    graph_path = "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/graph_complete.pickle" #"/home/******/repos/iterative-contraction/graphs/graph_complete.pickle"
-    sdiff_path = "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/" #"/home/******/repos/demonstrator_pcd_lines/resources/data/******/sdiff/insensitive/"
+    graph_path = "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/graph_complete.pickle"  # "/home/******/repos/iterative-contraction/graphs/graph_complete.pickle"
+    sdiff_path = "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/"  # "/home/******/repos/demonstrator_pcd_lines/resources/data/******/sdiff/insensitive/"
     file_name = "aaaany_3D.jpg"
 
     # load and prepare scene
@@ -63,5 +55,3 @@ if __name__ == "__main__":
 
     # convert graph to sdiff
     graph2sdiff(scene, graph_path, sdiff_path, file_name, width_plots=True)
-
-
