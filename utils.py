@@ -1,6 +1,8 @@
+import time
 import numpy as np
 import networkx as nx
 from matplotlib import pyplot as plt
+from skimage.measure import profile_line
 from scipy.ndimage.filters import gaussian_filter
 
 
@@ -86,8 +88,13 @@ def rectangle_transform(prof_line, base=20, height=0.9):
 
     # cancel irrelevant regions
     intersects = np.nonzero(np.gradient(np.sign(gx - a)))[0]
-    inter_idx = np.where(np.sign(intersects - len(gx) // 2) == 1)[0][0]
-    inter_idxs = intersects[inter_idx-1:inter_idx+1]
+    try:
+        inter_idx = np.where(np.sign(intersects - len(gx) // 2) == 1)[0][0]
+    except:
+        return -1, a[0], b[0], np.array([2,3])
+
+    inter_idx = max(inter_idx, 1)
+    inter_idxs = intersects[inter_idx - 1:inter_idx + 1]
     gx[:inter_idxs[0]] = a[:inter_idxs[0]]
     gx[inter_idxs[1]:] = a[inter_idxs[1]:]
 
@@ -95,7 +102,7 @@ def rectangle_transform(prof_line, base=20, height=0.9):
     nom = a[0] * length - np.trapz(gx - np.abs(gx - a), x)
     w = nom / (2 * (a[0] - b[0]))
 
-    return w, a[0], b[0], inter_idxs/10
+    return w, a[0], b[0], inter_idxs / 10
 
 
 def intersection_approach(prof_line, height=0.5):
@@ -173,3 +180,109 @@ def fit_parabola(prof_line):
 
         x = x[keep]
         y = y[keep]
+
+
+def graph2widths(G, scene, width_plots=False):
+    # set parameters
+    pixel_size = (scene.cameras[0].pixel_height + scene.cameras[0].pixel_width) / 2
+    f = scene.cameras[0].focal_length
+    length = 25
+
+    for node in G.nodes:
+        neighbors = list(G.neighbors(node))
+
+        if len(neighbors) == 2:
+            # get positions
+            pos0 = G.nodes[node]["pos"]
+            pos1 = G.nodes[neighbors[0]]["pos"]
+            pos2 = G.nodes[neighbors[1]]["pos"]
+
+            # get norms
+            norm0 = G.nodes[node]["normal"]
+            norm1 = G.nodes[node]["normal"]
+            norm2 = G.nodes[node]["normal"]
+
+            # project points
+            uv0, uv_mask, distances, angles = scene.point2uvs(pos0, norm0)
+            uv1, uv_mask, distances, angles = scene.point2uvs(pos1, norm1)
+            uv2, uv_mask, distances, angles = scene.point2uvs(pos2, norm2)
+
+            # get closed image
+            idx = np.argmin(distances[uv_mask])
+
+            # prepare orthogonal line
+            angle = np.arctan2(uv2[idx, 1] - uv1[idx, 1], uv2[idx, 0] - uv1[idx, 0])
+            yd = np.cos(angle) * length
+            xd = np.sin(angle) * length
+            p1 = (int(uv0[idx, 1]) + yd, int(uv0[idx, 0]) - xd)
+            p2 = (int(uv0[idx, 1]) - yd, int(uv0[idx, 0]) + xd)
+
+            # extract line
+            img = scene.images[idx, ..., 0]
+            prof_line = profile_line(img, p1, p2, linewidth=3)
+            prof_line2, shift = centralize_profline(prof_line)
+            width, a, b, idxs = rectangle_transform(prof_line2, base=40)
+
+            # translate px to mm
+            width_px = width
+            d = distances[idx] * 1000  # to mm
+            width = width * d * pixel_size / f
+
+            # check if width estimation is viable
+            if np.isnan(width):
+                G.nodes[node]["width"] = -1
+                width = -1
+            else:
+                G.nodes[node]["width"] = width
+
+            if width_plots:
+                # vertex id
+                id = str(time.time())
+                G.nodes[node]["id"] = id
+
+                plt.clf()
+                fig = plt.figure()
+                plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
+
+                # subplot 1
+                ax = fig.add_subplot(121)  # plt.subplot(121)
+                plt.xlabel("Position [px]")
+                plt.ylabel("Grauwert")
+                plt.title("Grauwertprofil")
+
+                # plot profile, median, and rectangle
+                ax.plot(prof_line, label="Profil")
+                ax.plot(np.full((len(prof_line)), a), 'gray', label="Median", linestyle='dashed')
+                half = np.sum(idxs) / 2 - shift
+                ax.plot([half - width_px / 2 - 0.0001, half - width_px / 2, half + width_px / 2,
+                         half + width_px / 2 + 0.0001, half - width_px / 2 - 0.0001],
+                        [a, b, b, a, a], label="Rechteck")
+
+                ax.set_aspect(1.0 / ax.get_data_ratio(), adjustable='box')
+                ax.legend(loc="lower right", fontsize=6)
+                plt.xticks([0, 10, 20, 30, 40, 50])
+                # subplot 2
+                plt.subplot(122)
+                plt.imshow(img[uv0[idx, 1] - 2 * length:uv0[idx, 1] + 2 * length,
+                           uv0[idx, 0] - 2 * length:uv0[idx, 0] + 2 * length], 'gray')
+                plt.plot([p1[1] - uv0[idx, 0] + 2 * length, p2[1] - uv0[idx, 0] + 2 * length],
+                         [p1[0] - uv0[idx, 1] + 2 * length, p2[0] - uv0[idx, 1] + 2 * length])
+                plt.plot(2 * length, 2 * length, 'x')
+                plt.xlabel("Bildkoordinate horizontal [px]")
+                plt.ylabel("Bildkoordinate vertikal [px]")
+                plt.title("Bildausschnitt")
+                plt.xticks([0, 25, 50, 75, 100])
+                plt.yticks([0, 25, 50, 75, 100])
+                plt.subplots_adjust(top=0.85)
+
+                # save figure
+                fig.suptitle(
+                    "Breite [px]: " + str(np.round(width_px, 2)) +
+                    "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
+                #plt.show()
+                plt.savefig(
+                    "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/widths/" + id + ".png",
+                    dpi=300,
+                    bbox_inches='tight')
+                plt.close(fig)
+    return G

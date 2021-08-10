@@ -1,5 +1,6 @@
 import json
 import time
+import uuid
 import numpy as np
 import networkx as nx
 
@@ -16,8 +17,14 @@ def create_empty_SDIFF():
 def construct_line(sdiff, G, node):
     """ Construct a line from G and starting node. """
 
-    # loop over nodes neighbors
-    for neighbor in list(G.neighbors(node)):
+    neighbors = list(G.neighbors(node))
+
+    # cycle case
+    if len(neighbors) == 2:
+        neighbors = [neighbors[0]]
+
+    # loop over node's neighbors
+    for neighbor in neighbors:
         curr_node = neighbor
 
         # create stub for line
@@ -44,7 +51,7 @@ def construct_line(sdiff, G, node):
             'coordinates': list(G.nodes[node]['pos'])
         })
         G.remove_edge(node, curr_node)
-
+        print()
         # intermediate nodes
         while len(list(G.neighbors(curr_node))) == 1:
             # TODO: why -9?
@@ -62,7 +69,7 @@ def construct_line(sdiff, G, node):
             # in case vertex has id for width plot
             try:
                 sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'][-1]['id'] = \
-                G.nodes[curr_node]['id']
+                    G.nodes[curr_node]['id']
             except:
                 pass
 
@@ -78,40 +85,55 @@ def construct_line(sdiff, G, node):
     return sdiff, G
 
 
-def append_feature(sdiff, G, img_name):
+def append_feature(sdiff, G, img_name, category="crack"):
     """ Append a feature to the sdiff. """
     # loop over connected components
-    for GG in [G.subgraph(c).copy() for c in nx.connected_components(G)]:
-        # create new feature (one feature per edge/line)
-        sdiff['features'].append({
-            'id': img_name + "|" + time.asctime().replace(' ', '_'),  # str(uuid.uuid4()),
-            'reconstruction': {},
-        })
 
-        # fill view
-        sdiff['features'][-1]['reconstruction'] = {
-            'annotation': 'automatic',
-            'metric_unit': 'm',
-            'skeleton': []
-        }
+    # create new feature (one feature per edge/line)
+    sdiff['features'].append({
+        'id': str(uuid.uuid4()),  # img_name + "|" + time.asctime().replace(' ', '_'),  # str(uuid.uuid4()),
+        'category': category,
+        'reconstruction': {},
+    })
 
-        # determine intermediate and end nodes
-        deg = GG.degree(GG.nodes)
-        end_nodes = np.array([elem for elem in deg if elem[1] == 1])
-        inter_nodes = np.array([elem for elem in deg if elem[1] > 2])
+    # fill view
+    sdiff['features'][-1]['reconstruction'] = {
+        'annotation': 'automatic',
+        'metric_unit': 'm',
+        'skeleton': []
+    }
 
-        # subgraph without furcations
-        if len(inter_nodes) == 0:
-            node = end_nodes[0]
-            sdiff, GG = construct_line(sdiff, GG, node[0])
+    # determine intermediate and end nodes
+    deg = G.degree(G.nodes)
+    end_nodes = np.array([elem for elem in deg if elem[1] == 1])
+    inter_nodes = np.array([elem for elem in deg if elem[1] > 2])
+    tmpp = list(deg)
 
-        # subgraph with furcations
-        else:
-            for node in inter_nodes:
-                for neighbor in list(GG.neighbors(node[0])):
-                    sdiff, GG = construct_line(sdiff, GG, neighbor)
+    # subgraph with cycle
+    if len(end_nodes) == 0:
+        node = list(list(deg)[0])
+        sdiff, G = construct_line(sdiff, G, node[0])
+
+    # subgraph without furcations
+    elif len(inter_nodes) == 0:
+        node = end_nodes[0]
+        sdiff, G = construct_line(sdiff, G, node[0])
+
+    # subgraph with furcations
+    else:
+        for node in inter_nodes:
+            for neighbor in list(G.neighbors(node[0])):
+                sdiff, G = construct_line(sdiff, G, neighbor)
 
     return sdiff
+
+
+def append_feature_noncrack(sdiff, category):
+    sdiff['features'].append({
+        'id': str(uuid.uuid4()),  # img_name + "|" + time.asctime().replace(' ', '_'),  # str(uuid.uuid4()),
+
+        'reconstruction': {},
+    })
 
 
 def save_SDIFF(sdiff, path, schema):
