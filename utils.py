@@ -6,6 +6,17 @@ from skimage.measure import profile_line
 from scipy.ndimage.filters import gaussian_filter
 
 
+def compute_area(G):
+    positions = np.array(list(nx.get_edge_attributes(G, "points").values()))[0, ...]
+    center_gravity = np.mean(positions, axis=0)
+    positions = positions - center_gravity
+    norms = np.linalg.norm(np.cross(positions, np.roll(positions, 1, axis=0)), axis=1)
+    area = 0.5 * np.sum(norms)
+    # to centimeter
+    area *= 10000
+    return area
+
+
 def place_nodes(G, gap=0.01):
     """ Interpolate and place graph nodes with a specific gap in-between. """
     # place nodes a gap points
