@@ -6,15 +6,18 @@ from skimage.measure import profile_line
 from scipy.ndimage.filters import gaussian_filter
 
 
-def compute_area(G):
-    positions = np.array(list(nx.get_edge_attributes(G, "points").values()))[0, ...]
+def compute_area(positions):
+    """ Computes area of 3D polygon using the cross product. """
     center_gravity = np.mean(positions, axis=0)
     positions = positions - center_gravity
     norms = np.linalg.norm(np.cross(positions, np.roll(positions, 1, axis=0)), axis=1)
     area = 0.5 * np.sum(norms)
-    # to centimeter
-    area *= 10000
     return area
+
+
+def compute_length(positions):
+    """ Computes the length of the polygonal chain. """
+    return np.sum(np.linalg.norm(positions - np.roll(positions, 1, axis=0), axis=1))
 
 
 def place_nodes(G, gap=0.01):
@@ -278,7 +281,7 @@ def graph2widths(G, scene, width_plots=False):
                            uv0[idx, 0] - 2 * length:uv0[idx, 0] + 2 * length], 'gray')
                 plt.plot([p1[1] - uv0[idx, 0] + 2 * length, p2[1] - uv0[idx, 0] + 2 * length],
                          [p1[0] - uv0[idx, 1] + 2 * length, p2[0] - uv0[idx, 1] + 2 * length])
-                plt.plot(2 * length, 2 * length, 'x')
+                #plt.plot(2 * length, 2 * length, 'x')
                 plt.xlabel("Bildkoordinate horizontal [px]")
                 plt.ylabel("Bildkoordinate vertikal [px]")
                 plt.title("Bildausschnitt")
