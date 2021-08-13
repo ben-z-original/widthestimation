@@ -1,6 +1,9 @@
 import time
 import numpy as np
 import networkx as nx
+import matplotlib
+
+matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from skimage.measure import profile_line
 from scipy.ndimage.filters import gaussian_filter
@@ -221,19 +224,30 @@ def graph2widths(G, scene, width_plots=False):
             uv1, uv_mask, distances, angles = scene.point2uvs(pos1, norm1)
             uv2, uv_mask, distances, angles = scene.point2uvs(pos2, norm2)
 
-            # get closed image
-            idx = np.argmin(distances[uv_mask])
+            # sort distances (ascending)
+            argsort_distances = np.argsort(distances[uv_mask])
 
-            # prepare orthogonal line
-            angle = np.arctan2(uv2[idx, 1] - uv1[idx, 1], uv2[idx, 0] - uv1[idx, 0])
-            yd = np.cos(angle) * length
-            xd = np.sin(angle) * length
-            p1 = (int(uv0[idx, 1]) + yd, int(uv0[idx, 0]) - xd)
-            p2 = (int(uv0[idx, 1]) - yd, int(uv0[idx, 0]) + xd)
+            # get closed image
+            for i in range(len(distances[uv_mask])):
+                idx = argsort_distances[i]
+
+                # prepare orthogonal line
+                angle = np.arctan2(uv2[idx, 1] - uv1[idx, 1], uv2[idx, 0] - uv1[idx, 0])
+                yd = np.cos(angle) * length
+                xd = np.sin(angle) * length
+                p1 = (int(uv0[idx, 1]) + yd, int(uv0[idx, 0]) - xd)
+                p2 = (int(uv0[idx, 1]) - yd, int(uv0[idx, 0]) + xd)
+
+                # check crossing image border
+                if 0 < p1[0] - 2 * length and p1[0] + 2 * length < scene.cameras[0].h and \
+                        0 < p2[0] - 2 * length and p2[0] + 2 * length < scene.cameras[0].h and \
+                        0 < p1[1] - 2 * length and p1[1] + 2 * length < scene.cameras[0].w and \
+                        0 < p2[1] - 2 * length and p2[1] + 2 * length < scene.cameras[0].w:
+                    break
 
             # extract line
             img = scene.images[idx, ..., 0]
-            prof_line = profile_line(img, p1, p2, linewidth=3)
+            prof_line = profile_line(img, p1, p2, linewidth=3, mode='constant')
             prof_line2, shift = centralize_profline(prof_line)
             width, a, b, idxs = rectangle_transform(prof_line2, base=40)
 
@@ -281,7 +295,7 @@ def graph2widths(G, scene, width_plots=False):
                            uv0[idx, 0] - 2 * length:uv0[idx, 0] + 2 * length], 'gray')
                 plt.plot([p1[1] - uv0[idx, 0] + 2 * length, p2[1] - uv0[idx, 0] + 2 * length],
                          [p1[0] - uv0[idx, 1] + 2 * length, p2[0] - uv0[idx, 1] + 2 * length])
-                #plt.plot(2 * length, 2 * length, 'x')
+                # plt.plot(2 * length, 2 * length, 'x')
                 plt.xlabel("Bildkoordinate horizontal [px]")
                 plt.ylabel("Bildkoordinate vertikal [px]")
                 plt.title("Bildausschnitt")
@@ -293,7 +307,7 @@ def graph2widths(G, scene, width_plots=False):
                 fig.suptitle(
                     "Breite [px]: " + str(np.round(width_px, 2)) +
                     "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
-                # plt.show()
+                plt.show()
                 plt.savefig(
                     "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/widths/" + id + ".png",
                     dpi=300,
