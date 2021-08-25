@@ -1,8 +1,8 @@
+import os
 import time
 import numpy as np
 import networkx as nx
 import matplotlib
-
 matplotlib.use('TkAgg')
 from matplotlib import pyplot as plt
 from skimage.measure import profile_line
@@ -199,7 +199,7 @@ def fit_parabola(prof_line):
         y = y[keep]
 
 
-def graph2widths(G, scene, width_plots=False):
+def graph2widths(G, scene, plot_dir=""):
     # set parameters
     pixel_size = (scene.cameras[0].pixel_height + scene.cameras[0].pixel_width) / 2
     f = scene.cameras[0].focal_length
@@ -263,7 +263,7 @@ def graph2widths(G, scene, width_plots=False):
             else:
                 G.nodes[node]["width"] = width
 
-            if width_plots:
+            if plot_dir is not "":
                 # vertex id
                 id = str(time.time())
                 G.nodes[node]["id"] = id
@@ -307,9 +307,9 @@ def graph2widths(G, scene, width_plots=False):
                 fig.suptitle(
                     "Breite [px]: " + str(np.round(width_px, 2)) +
                     "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
-                plt.show()
+                #plt.show()
                 plt.savefig(
-                    "/home/******/repos/defect-demonstration/static/uploads/2021_07_20__15_19_17/widths/" + id + ".png",
+                    os.path.join(plot_dir, id + ".png"),
                     dpi=300,
                     bbox_inches='tight')
                 plt.close(fig)

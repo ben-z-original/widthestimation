@@ -2,7 +2,11 @@ import json
 import uuid
 import numpy as np
 import networkx as nx
-from utils import compute_area, compute_length
+
+try:
+    from utils import compute_area, compute_length
+except:
+    from .utils import compute_area, compute_length
 
 
 def create_empty_SDIFF():
@@ -16,7 +20,6 @@ def create_empty_SDIFF():
 
 def construct_polygon(sdiff, G):
     """ Construct a polygon from G. """
-
     # get positions (assumption: positions are already in right order!)
     positions = np.array(list(nx.get_node_attributes(G, "pos").values()))
 
@@ -64,94 +67,86 @@ def construct_polygon(sdiff, G):
     return sdiff, G
 
 
-def construct_line(sdiff, G, node):
+def construct_line(sdiff, G, node, succ_node):
     """ Construct a line from G and starting node. """
 
-    sdiff['features'][-1]['reconstruction']['skeleton'] = []
+    curr_node = succ_node
 
-    neighbors = list(G.neighbors(node))
+    # create stub for line
+    sdiff['features'][-1]['reconstruction']['skeleton'].append({
+        'polyline': {
+            'length': -1,
+            'width': {
+                'max': -1,
+                'mean': -1,
+                'median': -1
+            },
+            'vertices': []
+        }
+    })
 
-    # cycle case
-    if len(neighbors) == 2:
-        neighbors = [neighbors[0]]
+    # starting node
+    sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'].append({
+        'coordinates': list(G.nodes[node]['pos'])
+    })
+    G.remove_edge(node, succ_node)
 
-    # loop over node's neighbors
-    for neighbor in neighbors:
-        curr_node = neighbor
+    widths = []
+    positions = []
 
-        # create stub for line
-        sdiff['features'][-1]['reconstruction']['skeleton'].append({
-            'polyline': {
-                'length': -1,
-                'width': {
-                    'max': -1,
-                    'mean': -1,
-                    'median': -1
-                },
-                'vertices': []
-            }
-        })
+    # intermediate nodes
+    while len(list(G.neighbors(succ_node))) == 1:
+        # TODO: why -9?
+        try:
+            width = G.nodes[succ_node]['width']
+            widths.append(width)
+        except:
+            width = -9
 
-        # starting node
+        positions.append(list(G.nodes[succ_node]['pos']))
+
+        # add vertex
         sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'].append({
-            'coordinates': list(G.nodes[node]['pos'])
+            'coordinates': list(G.nodes[succ_node]['pos']),
+            'width': width
         })
-        G.remove_edge(node, curr_node)
 
-        widths = []
-        positions = []
+        # in case vertex has id for width plot
+        try:
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'][-1]['id'] = \
+                G.nodes[succ_node]['id']
+        except:
+            pass
 
-        # intermediate nodes
-        while len(list(G.neighbors(curr_node))) == 1:
-            # TODO: why -9?
-            try:
-                width = G.nodes[curr_node]['width']
-                widths.append(width)
-            except:
-                width = -9
-
-            positions.append(list(G.nodes[curr_node]['pos']))
-
-            # add vertex
-            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'].append({
-                'coordinates': list(G.nodes[curr_node]['pos']),
-                'width': width
-            })
-
-            # in case vertex has id for width plot
-            try:
-                sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'][-1]['id'] = \
-                    G.nodes[curr_node]['id']
-            except:
-                pass
-
-            # update node
-            last_node = curr_node
-            curr_node = list(G.neighbors(curr_node))[0]
-            G.remove_edge(last_node, curr_node)
+        # update node
+        last_node = succ_node
+        succ_node = list(G.neighbors(succ_node))[0]
+        G.remove_edge(last_node, succ_node)
 
         # end node
         sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'].append({
-            'coordinates': list(G.nodes[curr_node]['pos'])
+            'coordinates': list(G.nodes[succ_node]['pos'])
         })
 
-        # update widths and length
+    # update widths and length
+    if positions != []:
         positions = np.array(positions)
-        tmp = positions[:-1,...] - np.roll(positions, 1, axis=0)[:-1,...]
-        tmp2 = np.linalg.norm(tmp, axis=1)
-        tmp3 = np.sum(tmp2)
-        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['length'] = tmp3
+        tmp = positions[:-1, ...] - np.roll(positions, 1, axis=0)[:-1, ...]
+        tmp = np.sum(np.linalg.norm(tmp, axis=1))
+        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['length'] = tmp
 
         widths = np.array(widths)
 
-        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['max'] = np.nanmax(widths)
-        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['mean'] = np.nanmean(widths)
-        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['median'] = np.nanmedian(widths)
+        if len(widths) > 0 and not np.all(np.isnan(widths)):
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['max'] = np.nanmax(widths)
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['mean'] = np.nanmean(widths)
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['median'] = np.nanmedian(
+                widths)
 
     return sdiff, G
 
 
-def append_feature(sdiff, G, img_name, category="crack"):
+def append_feature(sdiff, G, category="crack"):
     """ Append a feature to the sdiff. """
     # loop over connected components
 
@@ -166,6 +161,7 @@ def append_feature(sdiff, G, img_name, category="crack"):
     sdiff['features'][-1]['reconstruction'] = {
         'annotation': 'automatic',
         'metric_unit': 'm',
+        'skeleton': []
     }
 
     # determine intermediate and end nodes
@@ -177,15 +173,17 @@ def append_feature(sdiff, G, img_name, category="crack"):
         # subgraph without furcations
         if len(inter_nodes) == 0:
             node = end_nodes[0]
-            sdiff, G = construct_line(sdiff, G, node[0])
+            sdiff, G = construct_line(sdiff, G, node[0], succ_node=list(G.neighbors(node[0]))[0])
 
         # subgraph with furcations
         else:
             for node in inter_nodes:
                 for neighbor in list(G.neighbors(node[0])):
-                    sdiff, G = construct_line(sdiff, G, neighbor)
+                    pass
+                    sdiff, G = construct_line(sdiff, G, node[0], succ_node=neighbor)
 
-    if category != "crack":  # len(end_nodes) == 0:
+    # category != "crack":
+    else:
         # subgraph with cycle
         sdiff, G = construct_polygon(sdiff, G)
 
