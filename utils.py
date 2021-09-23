@@ -74,6 +74,7 @@ def centralize_profline(prof_line):
     length = len(prof_line)
     center = length // 2
     argmini = np.argmin(prof_line)
+    medi = np.median(prof_line)
     shift = center - argmini
 
     # centralize
@@ -81,9 +82,9 @@ def centralize_profline(prof_line):
 
     # padding 'same'
     if shift < 0:
-        prof_line[shift:] = prof_line[shift - 1]
+        prof_line[shift:] = medi
     elif shift > 0:
-        prof_line[:shift] = prof_line[shift]
+        prof_line[:shift] = medi
 
     return prof_line, shift
 
@@ -117,7 +118,7 @@ def rectangle_transform(prof_line, base=20, height=0.9):
 
     # apply equation from paper
     nom = a[0] * length - np.trapz(gx - np.abs(gx - a), x)
-    w = nom / (2 * (a[0] - b[0]))
+    w = nom / max(2 * (a[0] - b[0]), np.finfo(np.float32).eps)
 
     return w, a[0], b[0], inter_idxs / 10
 
@@ -200,36 +201,45 @@ def fit_parabola(prof_line):
 
 
 def graph2widths(G, scene, plot_dir=""):
-    # set parameters
-    pixel_size = (scene.cameras[0].pixel_height + scene.cameras[0].pixel_width) / 2
-    f = scene.cameras[0].focal_length
+    """ Computes width for every node in the graph. """
+    # set length of profile line
     length = 25
 
     for node in G.nodes:
         neighbors = list(G.neighbors(node))
 
         if len(neighbors) == 2:
-            # get positions
-            pos0 = G.nodes[node]["pos"]
-            pos1 = G.nodes[neighbors[0]]["pos"]
-            pos2 = G.nodes[neighbors[1]]["pos"]
+            # get positions and normals
+            pos0, pos1, pos2 = G.nodes[node]["pos"], G.nodes[neighbors[0]]["pos"], G.nodes[neighbors[1]]["pos"]
+            norm0, norm1, norm2 = G.nodes[node]["normal"], G.nodes[neighbors[0]]["normal"], G.nodes[neighbors[1]][
+                "normal"]
 
-            # get norms
-            norm0 = G.nodes[node]["normal"]
-            norm1 = G.nodes[node]["normal"]
-            norm2 = G.nodes[node]["normal"]
+            # project three points
+            res = scene.compute_uvs(pos0.tolist(), norm0.tolist())
+            uv0 = np.array([res[0], res[1]], np.int32).T
+            mask_uv0 = np.array(res[3], np.int32)
 
-            # project points
-            uv0, uv_mask, distances, angles = scene.point2uvs(pos0, norm0)
-            uv1, uv_mask, distances, angles = scene.point2uvs(pos1, norm1)
-            uv2, uv_mask, distances, angles = scene.point2uvs(pos2, norm2)
+            res = scene.compute_uvs(pos1.tolist(), norm1.tolist())
+            uv1 = np.array([res[0], res[1]], np.int32).T
+            mask_uv1 = np.array(res[3], np.int32)
+            distances = np.array(res[2])
 
-            # sort distances (ascending)
-            argsort_distances = np.argsort(distances[uv_mask])
+            res = scene.compute_uvs(pos2.tolist(), norm2.tolist())
+            uv2 = np.array([res[0], res[1]], np.int32).T
+            mask_uv = mask_uv0 * mask_uv1 * np.array(res[3], np.int32)
 
-            # get closed image
-            for i in range(len(distances[uv_mask])):
-                idx = argsort_distances[i]
+            # angles and weight
+            angles = np.array(scene.compute_angles(norm1.tolist()))
+            weight = np.array(
+                scene.compute_weight(uv1[:, 0].tolist(), uv1[:, 1].tolist(), distances.tolist(), mask_uv.tolist(),
+                                     angles.tolist())).T
+
+            # sort weights (descending)
+            argsort_weights = np.argsort(-weight)
+
+            # get highest weighted image
+            for i in range(len(weight)):
+                idx = argsort_weights[i]
 
                 # prepare orthogonal line
                 angle = np.arctan2(uv2[idx, 1] - uv1[idx, 1], uv2[idx, 0] - uv1[idx, 0])
@@ -239,78 +249,79 @@ def graph2widths(G, scene, plot_dir=""):
                 p2 = (int(uv0[idx, 1]) - yd, int(uv0[idx, 0]) + xd)
 
                 # check crossing image border
-                if 0 < p1[0] - 2 * length and p1[0] + 2 * length < scene.cameras[0].h and \
-                        0 < p2[0] - 2 * length and p2[0] + 2 * length < scene.cameras[0].h and \
-                        0 < p1[1] - 2 * length and p1[1] + 2 * length < scene.cameras[0].w and \
-                        0 < p2[1] - 2 * length and p2[1] + 2 * length < scene.cameras[0].w:
-                    break
+                if not (0 < p1[0] - 2 * length and p1[0] + 2 * length < scene.height and
+                        0 < p2[0] - 2 * length and p2[0] + 2 * length < scene.height and
+                        0 < p1[1] - 2 * length and p1[1] + 2 * length < scene.width and
+                        0 < p2[1] - 2 * length and p2[1] + 2 * length < scene.width):
+                    continue
 
-            # extract line
-            img = scene.images[idx, ..., 0]
-            prof_line = profile_line(img, p1, p2, linewidth=3, mode='constant')
-            prof_line2, shift = centralize_profline(prof_line)
-            width, a, b, idxs = rectangle_transform(prof_line2, base=40)
+                # extract line
+                img = np.array(scene.get_image(idx)).reshape(scene.height, scene.width)
+                prof_line = profile_line(img, p1, p2, linewidth=3, mode='constant')
+                prof_line2, shift = centralize_profline(prof_line)
+                width, a, b, idxs = rectangle_transform(prof_line2)
 
-            # translate px to mm
-            width_px = width
-            d = distances[idx] * 1000  # to mm
-            width = width * d * pixel_size / f
+                # translate px to mm
+                width_px = width
+                d = distances[idx] * 1000  # to mm
+                width = width * d * scene.pixel_size / scene.focal_length
 
-            # check if width estimation is viable
-            if np.isnan(width):
-                G.nodes[node]["width"] = -1
-                width = -1
-            else:
-                G.nodes[node]["width"] = width
+                # check if width estimation is viable
+                if np.isnan(width):
+                    G.nodes[node]["width"] = -1
+                    width = -1
+                else:
+                    G.nodes[node]["width"] = width
 
-            if plot_dir is not "":
-                # vertex id
-                id = str(time.time())
-                G.nodes[node]["id"] = id
+                if plot_dir != "":
+                    # vertex id
+                    id = str(time.time()).replace(".", "_")
+                    G.nodes[node]["id"] = id
 
-                plt.clf()
-                fig = plt.figure()
-                plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
+                    plt.clf()
+                    fig = plt.figure()
+                    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
 
-                # subplot 1
-                ax = fig.add_subplot(121)  # plt.subplot(121)
-                plt.xlabel("Position [px]")
-                plt.ylabel("Grauwert")
-                plt.title("Grauwertprofil")
+                    # subplot 1
+                    ax = fig.add_subplot(121)  # plt.subplot(121)
+                    plt.xlabel("Position [px]")
+                    plt.ylabel("Grauwert")
+                    plt.title("Grauwertprofil")
 
-                # plot profile, median, and rectangle
-                ax.plot(prof_line, label="Profil")
-                ax.plot(np.full((len(prof_line)), a), 'gray', label="Median", linestyle='dashed')
-                half = np.sum(idxs) / 2 - shift
-                ax.plot([half - width_px / 2 - 0.0001, half - width_px / 2, half + width_px / 2,
-                         half + width_px / 2 + 0.0001, half - width_px / 2 - 0.0001],
-                        [a, b, b, a, a], label="Rechteck")
+                    # plot profile, median, and rectangle
+                    ax.plot(prof_line, label="Profil")
+                    ax.plot(np.full((len(prof_line)), a), 'gray', label="Median", linestyle='dashed')
+                    half = np.sum(idxs) / 2 - shift
+                    ax.plot([half - width_px / 2 - 0.0001, half - width_px / 2, half + width_px / 2,
+                             half + width_px / 2 + 0.0001, half - width_px / 2 - 0.0001],
+                            [a, b, b, a, a], label="Rechteck")
 
-                ax.set_aspect(1.0 / ax.get_data_ratio(), adjustable='box')
-                ax.legend(loc="lower right", fontsize=6)
-                plt.xticks([0, 10, 20, 30, 40, 50])
-                # subplot 2
-                plt.subplot(122)
-                plt.imshow(img[uv0[idx, 1] - 2 * length:uv0[idx, 1] + 2 * length,
-                           uv0[idx, 0] - 2 * length:uv0[idx, 0] + 2 * length], 'gray')
-                plt.plot([p1[1] - uv0[idx, 0] + 2 * length, p2[1] - uv0[idx, 0] + 2 * length],
-                         [p1[0] - uv0[idx, 1] + 2 * length, p2[0] - uv0[idx, 1] + 2 * length])
-                # plt.plot(2 * length, 2 * length, 'x')
-                plt.xlabel("Bildkoordinate horizontal [px]")
-                plt.ylabel("Bildkoordinate vertikal [px]")
-                plt.title("Bildausschnitt")
-                plt.xticks([0, 25, 50, 75, 100])
-                plt.yticks([0, 25, 50, 75, 100])
-                plt.subplots_adjust(top=0.85)
+                    ax.set_aspect(1.0 / ax.get_data_ratio(), adjustable='box')
+                    ax.legend(loc="lower right", fontsize=6)
+                    plt.xticks([0, 10, 20, 30, 40, 50])
+                    # subplot 2
+                    plt.subplot(122)
+                    plt.imshow(img[uv0[idx, 1] - 2 * length:uv0[idx, 1] + 2 * length,
+                               uv0[idx, 0] - 2 * length:uv0[idx, 0] + 2 * length], 'gray')
+                    plt.plot([p1[1] - uv0[idx, 0] + 2 * length, p2[1] - uv0[idx, 0] + 2 * length],
+                             [p1[0] - uv0[idx, 1] + 2 * length, p2[0] - uv0[idx, 1] + 2 * length])
+                    # plt.plot(2 * length, 2 * length, 'x')
+                    plt.xlabel("Bildkoordinate horizontal [px]")
+                    plt.ylabel("Bildkoordinate vertikal [px]")
+                    plt.title("Bildausschnitt")
+                    plt.xticks([0, 25, 50, 75, 100])
+                    plt.yticks([0, 25, 50, 75, 100])
+                    plt.subplots_adjust(top=0.85)
 
-                # save figure
-                fig.suptitle(
-                    "Breite [px]: " + str(np.round(width_px, 2)) +
-                    "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
-                #plt.show()
-                plt.savefig(
-                    os.path.join(plot_dir, id + ".png"),
-                    dpi=300,
-                    bbox_inches='tight')
-                plt.close(fig)
+                    # save figure
+                    fig.suptitle(
+                        "Breite [px]: " + str(np.round(width_px, 2)) +
+                        "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
+                    #plt.show()
+                    plt.savefig(
+                        os.path.join(plot_dir, id + ".png"),
+                        dpi=300,
+                        bbox_inches='tight')
+                    plt.close(fig)
+                break
     return G

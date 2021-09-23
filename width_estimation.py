@@ -2,15 +2,14 @@ import os
 import numpy as np
 from tqdm import tqdm
 import networkx as nx
+from scene import Scene
+
 try:
-    from projection.scene import Scene
     from utils import place_nodes, graph2widths, compute_area
     from sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 except:
-    from .projection.scene import Scene
     from .utils import place_nodes, graph2widths, compute_area
     from .sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
-
 
 categories = ["background", "control_point", "vegetation", "efflorescence", "corrosion", "spalling", "crack"]
 
@@ -52,19 +51,22 @@ def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
 if __name__ == "__main__":
 
     # paths
-    xml_path = os.path.join("/home/******/repos/defect-demonstration/static/uploads/bbv/cameras.xml")
-    path_list = [
-        "/home/******/repos/defect-demonstration/static/uploads/bbv/0_images"]
-    imgs_path = "/home/******/repos/defect-demonstration/static/uploads/bbv/images.npy"
-    graph_path = "/home/******/repos/defect-demonstration/static/uploads/bbv/balken_3_9M.pickle"
-    sdiff_path = "/home/******/repos/defect-demonstration/static/uploads/bbv/extracted_defects.sdiff"
-    width_path = "/home/******/repos/defect-demonstration/static/uploads/bbv/10_widths"
+    xml_path = os.path.join("/home/******/repos/defect-demonstration/static/uploads/mtb/cameras.xml")
+    graph_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/crack_1_4M_clustered.pickle"
+    sdiff_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/crack_1_4M_clustered.sdiff"
+    width_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/10_widths"
 
-    # load and prepare scene
-    scene = Scene.from_xml(xml_path)
-    scene.prepare_matrices()
-    scene.load_images(path_list=None, npy_path=imgs_path, scale=1.0)
+    for f in os.listdir(width_path):
+        os.remove(os.path.join(width_path, f))
 
-    # convert graph to sdiff
+    scene = Scene(xml_path)
+    scene.cache_images(
+        [
+            "/home/******/repos/defect-demonstration/static/uploads/mtb/0_images"
+        ],
+        "/home/******/repos/defect-demonstration/static/uploads/mtb/9_sharpness/",
+        "/home/******/repos/defect-demonstration/static/uploads/mtb/11_depth/",
+        1.0
+    )
+
     graph2sdiff(scene, graph_path, sdiff_path, plot_dir=width_path)
-
