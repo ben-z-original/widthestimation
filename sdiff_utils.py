@@ -138,10 +138,10 @@ def construct_line(sdiff, G, node, succ_node):
         widths = np.array(widths)
 
         if len(widths) > 0 and not np.all(np.isnan(widths)):
-            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['max'] = np.nanmax(widths)
-            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['mean'] = np.nanmean(widths)
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['max'] = np.nanmax(widths)/1000
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['mean'] = np.nanmean(widths)/1000
             sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['median'] = np.nanmedian(
-                widths)
+                widths)/1000
 
     return sdiff, G
 

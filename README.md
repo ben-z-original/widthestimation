@@ -6,6 +6,7 @@ This repository contains the code that was used for the publication:
 by *Christian Benz* and *Volker Rodehorst*<br>
 at the *International Conference on Machine Vision Applications* [MVA](http://www.mva-org.jp/mva2021/).
 
+Paper Link: http://www.mva-org.jp/Proceedings/2021/papers/P2-2.pdf
 
 ## Dataset
 The dataset was captured at four sites. For details please refer to [1].

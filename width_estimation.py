@@ -2,16 +2,16 @@ import os
 import numpy as np
 from tqdm import tqdm
 import networkx as nx
-from scene import Scene
 
 try:
+    from scene import Scene
     from utils import place_nodes, graph2widths, compute_area
     from sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 except:
     from .utils import place_nodes, graph2widths, compute_area
     from .sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 
-categories = ["background", "control_point", "vegetation", "efflorescence", "corrosion", "spalling", "crack"]
+categories = ["background", "control_point", "vegetation", "efflorescence", "corrosion", "spalling", "crack", "exposed_rebar"]
 
 
 def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
@@ -39,7 +39,7 @@ def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
             positions = np.array(list(nx.get_edge_attributes(SG, "points").values()))[0, ...]
             area = compute_area(positions)
 
-            if area * 10000 < 5:
+            if area * 10000 < 1:
                 continue
 
             SG = place_nodes(SG, gap=0.02)  # 0.005)
@@ -49,12 +49,11 @@ def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
 
 
 if __name__ == "__main__":
-
     # paths
     xml_path = os.path.join("/home/******/repos/defect-demonstration/static/uploads/mtb/cameras.xml")
-    graph_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/crack_1_4M_clustered.pickle"
-    sdiff_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/crack_1_4M_clustered.sdiff"
-    width_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/10_widths"
+    graph_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/exprebar_clustered.pickle"
+    sdiff_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/extracted_defects.sdiff"
+    width_path = "/home/******/repos/defect-demonstration/static/uploads/mtb/11_widths"
 
     for f in os.listdir(width_path):
         os.remove(os.path.join(width_path, f))
@@ -65,7 +64,7 @@ if __name__ == "__main__":
             "/home/******/repos/defect-demonstration/static/uploads/mtb/0_images"
         ],
         "/home/******/repos/defect-demonstration/static/uploads/mtb/9_sharpness/",
-        "/home/******/repos/defect-demonstration/static/uploads/mtb/11_depth/",
+        "/home/******/repos/defect-demonstration/static/uploads/mtb/10_depth/",
         1.0
     )
 
