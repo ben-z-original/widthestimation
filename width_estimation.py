@@ -26,6 +26,7 @@ def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
 
         category = list(SG.nodes(data='category'))[0][1]
 
+        # crack case
         if category == 6:
             # interpolate nodes
             SG = place_nodes(SG, gap=0.01)
