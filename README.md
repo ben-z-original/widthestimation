@@ -1,5 +1,7 @@
 # Crack Width Estimation using <br> Rectangle Transform
 
+### No warranty or support is granted in any way! Use at your own risk.
+
 This repository contains the code that was used for the publication:
 
 **Model-based Crack Width Estimation using Rectangle Transform** <br>
