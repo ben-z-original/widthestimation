@@ -4,9 +4,9 @@ import numpy as np
 import networkx as nx
 
 try:
-    from utils import compute_area, compute_length
+    from width_utils import compute_area, compute_length
 except:
-    from .utils import compute_area, compute_length
+    from .width_utils import compute_area, compute_length
 
 
 def create_empty_SDIFF():
@@ -27,7 +27,7 @@ def construct_polygon(sdiff, G):
     sdiff['features'][-1]['reconstruction']['boundary'] = []
     sdiff['features'][-1]['reconstruction']['boundary'].append({
         'polygon': {
-            'length': compute_length(positions),
+            'perimeter': compute_length(positions),
             'area': compute_area(positions),
             'vertices': []
         }
@@ -70,9 +70,8 @@ def construct_polygon(sdiff, G):
 def construct_line(sdiff, G, node, succ_node):
     """ Construct a line from G and starting node. """
 
-    curr_node = succ_node
-
     # create stub for line
+    sdiff['features'][-1]['reconstruction']['skeleton'] = []
     sdiff['features'][-1]['reconstruction']['skeleton'].append({
         'polyline': {
             'length': -1,
@@ -92,18 +91,16 @@ def construct_line(sdiff, G, node, succ_node):
     G.remove_edge(node, succ_node)
 
     widths = []
-    positions = []
+    positions = [G.nodes[node]['pos'], G.nodes[succ_node]['pos']]
 
     # intermediate nodes
     while len(list(G.neighbors(succ_node))) == 1:
         # TODO: why -9?
         try:
-            width = G.nodes[succ_node]['width']
+            width = G.nodes[succ_node]['width'] / 1000
             widths.append(width)
         except:
             width = -9
-
-        positions.append(list(G.nodes[succ_node]['pos']))
 
         # add vertex
         sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'].append({
@@ -123,6 +120,8 @@ def construct_line(sdiff, G, node, succ_node):
         succ_node = list(G.neighbors(succ_node))[0]
         G.remove_edge(last_node, succ_node)
 
+        positions.append(list(G.nodes[succ_node]['pos']))
+
         # end node
         sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['vertices'].append({
             'coordinates': list(G.nodes[succ_node]['pos'])
@@ -131,17 +130,18 @@ def construct_line(sdiff, G, node, succ_node):
     # update widths and length
     if positions != []:
         positions = np.array(positions)
-        tmp = positions[:-1, ...] - np.roll(positions, 1, axis=0)[:-1, ...]
-        tmp = np.sum(np.linalg.norm(tmp, axis=1))
-        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['length'] = tmp
+        sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['length'] = \
+            np.sum(np.linalg.norm(positions[:-1, ...] - np.roll(positions, 1, axis=0)[:-1, ...], axis=1))
 
         widths = np.array(widths)
 
         if len(widths) > 0 and not np.all(np.isnan(widths)):
-            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['max'] = np.nanmax(widths)/1000
-            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['mean'] = np.nanmean(widths)/1000
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['max'] = np.nanmax(
+                widths)
+            sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['mean'] = np.nanmean(
+                widths)
             sdiff['features'][-1]['reconstruction']['skeleton'][-1]['polyline']['width']['median'] = np.nanmedian(
-                widths)/1000
+                widths)
 
     return sdiff, G
 
@@ -161,7 +161,6 @@ def append_feature(sdiff, G, category="crack"):
     sdiff['features'][-1]['reconstruction'] = {
         'annotation': 'automatic',
         'metric_unit': 'm',
-        'skeleton': []
     }
 
     # determine intermediate and end nodes

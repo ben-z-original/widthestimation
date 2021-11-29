@@ -5,10 +5,10 @@ import networkx as nx
 
 try:
     from scene import Scene
-    from utils import place_nodes, graph2widths, compute_area
+    from width_utils import place_nodes, graph2widths, compute_area
     from sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 except:
-    from .utils import place_nodes, graph2widths, compute_area
+    from .width_utils import place_nodes, graph2widths, compute_area
     from .sdiff_utils import create_empty_SDIFF, append_feature, save_SDIFF
 
 categories = ["background", "control_point", "vegetation", "efflorescence", "corrosion", "spalling", "crack", "exposed_rebar"]
@@ -29,7 +29,12 @@ def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
         # crack case
         if category == 6:
             # interpolate nodes
-            SG = place_nodes(SG, gap=0.01)
+            SG = place_nodes(SG, gap=0.01, min_len=0.05)
+
+            # if graph is empty
+            if len(SG.nodes) == 0:
+                continue
+
             SG = graph2widths(SG, scene, plot_dir)
 
             sdiff = append_feature(sdiff, SG, category=categories[category])
@@ -40,7 +45,7 @@ def graph2sdiff(scene, graph_path, sdiff_path, plot_dir=""):
             positions = np.array(list(nx.get_edge_attributes(SG, "points").values()))[0, ...]
             area = compute_area(positions)
 
-            if area * 10000 < 1:
+            if area * 10000 < 0.5:
                 continue
 
             SG = place_nodes(SG, gap=0.02)  # 0.005)
