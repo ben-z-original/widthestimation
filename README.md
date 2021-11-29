@@ -1,5 +1,7 @@
 # Crack Width Estimation using <br> Rectangle Transform
 
+### No warranty or support is granted in any way! Use at your own risk.
+
 This repository contains the code that was used for the publication:
 
 **Model-based Crack Width Estimation using Rectangle Transform** <br>
@@ -15,10 +17,12 @@ Link: http://www.mva-org.jp/Proceedings/2021/papers/P2-2.pdf
 Please cite the work accordingly:
 
 ```
-@inproceedings{benz2021rectangle,
+@inproceedings{benz2021model,
 	title={Model-based Crack Width Estimation using Rectangle Transform},
 	author={Benz, Christian and Rodehorst, Volker},
-	booktitle={2021 17th International Conference on Machine Vision Applications (MVA)},
-	year={2021}
+	booktitle={2021 17th International Conference on Machine Vision and Applications (MVA)},
+	pages={1--5},
+	year={2021},
+	organization={IEEE}
 }
 ```
