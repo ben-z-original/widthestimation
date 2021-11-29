@@ -23,7 +23,7 @@ def compute_length(positions):
     return np.sum(np.linalg.norm(positions - np.roll(positions, 1, axis=0), axis=1))
 
 
-def place_nodes(G, gap=0.01):
+def place_nodes(G, gap=0.01, min_len=0.00):
     """ Interpolate and place graph nodes with a specific gap in-between. """
     # place nodes a gap points
     GG = nx.Graph()
@@ -54,6 +54,10 @@ def place_nodes(G, gap=0.01):
         # set nodes and edges
         nodes = [(keys[i], {"pos": positions[i, ...], "normal": normals[i, ...]}) for i in range(0, len(positions))]
         edges = [(keys[i - 1], keys[i]) for i in range(1, len(positions))]
+
+        # if length is too short
+        if np.sum(np.linalg.norm(positions[:-1,:] - np.roll(positions, 1, axis=0)[:-1,:], axis=1)) < min_len:
+            continue
 
         GG.add_nodes_from(nodes)
         GG.add_edges_from(edges)
