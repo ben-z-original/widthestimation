@@ -181,7 +181,19 @@ def append_feature(sdiff, G, category="crack"):
                     pass
                     sdiff, G = construct_line(sdiff, G, node[0], succ_node=neighbor)
 
-    # category != "crack":
+    elif category == "control_point":
+        node = list(G.nodes)[0]
+        pos = G.nodes[node]["pos"]
+        norm = G.nodes[node]["normal"]
+        #sdiff['features'][-1]['reconstruction']['centroid'] =
+        sdiff['features'][-1]['reconstruction']['centroid'] = {
+            "coordinates": list(pos),
+            "normal": list(norm)
+        }
+
+        sdiff['features'][-1]['views'] = {}
+        for k in G.nodes[node]["locations"].keys():
+            sdiff['features'][-1]['views'][k] = list(G.nodes[node]["locations"][k])
     else:
         # subgraph with cycle
         sdiff, G = construct_polygon(sdiff, G)
