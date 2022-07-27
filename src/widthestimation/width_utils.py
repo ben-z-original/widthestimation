@@ -220,17 +220,17 @@ def graph2widths(G, scene, plot_dir=""):
 
             # project three points
             res = scene.compute_uvs(pos0.tolist(), norm0.tolist())
-            uv0 = np.int32(np.array([res[0], res[1]]).T)
-            mask_uv0 = np.array(res[3], np.int32)
+            uv0 = np.vstack([res[0], res[1]]).astype(np.int64).T
+            mask_uv0 = np.array(res[3], np.int64)
 
             res = scene.compute_uvs(pos1.tolist(), norm1.tolist())
-            uv1 = np.int32(np.array([res[0], res[1]]).T)
-            mask_uv1 = np.array(res[3], np.int32)
+            uv1 = np.vstack([res[0], res[1]]).astype(np.int64).T
+            mask_uv1 = np.array(res[3], np.int64)
             distances = np.array(res[2])
 
             res = scene.compute_uvs(pos2.tolist(), norm2.tolist())
-            uv2 = np.int32(np.array([res[0], res[1]]).T)
-            mask_uv = mask_uv0 * mask_uv1 * np.array(res[3], np.int32)
+            uv2 = np.vstack([res[0], res[1]]).astype(np.int64).T
+            mask_uv = mask_uv0 * mask_uv1 * np.array(res[3], np.int64)
 
             # angles and weight
             angles = np.array(scene.compute_angles(norm1.tolist()))
