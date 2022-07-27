@@ -220,16 +220,16 @@ def graph2widths(G, scene, plot_dir=""):
 
             # project three points
             res = scene.compute_uvs(pos0.tolist(), norm0.tolist())
-            uv0 = np.array([res[0], res[1]], np.int32).T
+            uv0 = np.int32(np.array([res[0], res[1]]).T)
             mask_uv0 = np.array(res[3], np.int32)
 
             res = scene.compute_uvs(pos1.tolist(), norm1.tolist())
-            uv1 = np.array([res[0], res[1]], np.int32).T
+            uv1 = np.int32(np.array([res[0], res[1]]).T)
             mask_uv1 = np.array(res[3], np.int32)
             distances = np.array(res[2])
 
             res = scene.compute_uvs(pos2.tolist(), norm2.tolist())
-            uv2 = np.array([res[0], res[1]], np.int32).T
+            uv2 = np.int32(np.array([res[0], res[1]]).T)
             mask_uv = mask_uv0 * mask_uv1 * np.array(res[3], np.int32)
 
             # angles and weight
@@ -283,26 +283,30 @@ def graph2widths(G, scene, plot_dir=""):
                     G.nodes[node]["id"] = id
 
                     plt.clf()
-                    fig = plt.figure()
                     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=0.5, hspace=None)
+                    plt.suptitle(
+                        "Breite [px]: " + str(np.round(width_px, 2)) +
+                        "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
 
                     # subplot 1
-                    ax = fig.add_subplot(121)  # plt.subplot(121)
+                    plt.subplot(121)  # plt.subplot(121)
                     plt.xlabel("Position [px]")
                     plt.ylabel("Grauwert")
                     plt.title("Grauwertprofil")
 
                     # plot profile, median, and rectangle
-                    ax.plot(prof_line, label="Profil")
-                    ax.plot(np.full((len(prof_line)), a), 'gray', label="Median", linestyle='dashed')
+                    plt.plot(prof_line, label="Profil")
+                    plt.plot(np.full((len(prof_line)), a), 'gray', label="Median", linestyle='dashed')
                     half = np.sum(idxs) / 2 - shift
-                    ax.plot([half - width_px / 2 - 0.0001, half - width_px / 2, half + width_px / 2,
+                    plt.plot([half - width_px / 2 - 0.0001, half - width_px / 2, half + width_px / 2,
                              half + width_px / 2 + 0.0001, half - width_px / 2 - 0.0001],
                             [a, b, b, a, a], label="Rechteck")
 
-                    ax.set_aspect(1.0 / ax.get_data_ratio(), adjustable='box')
-                    ax.legend(loc="lower right", fontsize=6)
+                    plt.gca().set_aspect(1.0 / plt.gca().get_data_ratio(), adjustable='box')
+
+                    plt.legend(loc="lower right", fontsize=6)
                     plt.xticks([0, 10, 20, 30, 40, 50])
+
                     # subplot 2
                     plt.subplot(122)
                     plt.imshow(img[uv0[idx, 1] - 2 * length:uv0[idx, 1] + 2 * length,
@@ -318,14 +322,13 @@ def graph2widths(G, scene, plot_dir=""):
                     plt.subplots_adjust(top=0.85)
 
                     # save figure
-                    fig.suptitle(
-                        "Breite [px]: " + str(np.round(width_px, 2)) +
-                        "            Breite [mm]: " + str(np.round(width, 2)), y=0.8)
-                    #plt.show()
                     plt.savefig(
                         os.path.join(plot_dir, id + ".png"),
                         dpi=300,
                         bbox_inches='tight')
-                    plt.close(fig)
+                    plt.figure().clear()
+                    plt.close('all')
+                    plt.cla()
+                    plt.clf()
                 break
     return G
